@@ -1,0 +1,49 @@
+name: Build APK
+
+on:
+  push:
+    paths:
+      - 'MollierApp.zip'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Estrai MollierApp.zip
+        id: src
+        run: |
+          if [ ! -f MollierApp.zip ]; then
+            echo "ERRORE: MollierApp.zip non trovato nella radice del repository"
+            exit 1
+          fi
+          unzip -q -o MollierApp.zip -d _src
+          SETTINGS=$(find _src -name settings.gradle.kts | head -n 1)
+          if [ -z "$SETTINGS" ]; then
+            echo "ERRORE: settings.gradle.kts non trovato dentro lo zip"
+            exit 1
+          fi
+          DIR=$(dirname "$SETTINGS")
+          echo "Progetto trovato in: $DIR"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Compila APK
+        working-directory: ${{ steps.src.outputs.dir }}
+        run: gradle assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mollier-apk
+          path: ${{ steps.src.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
